@@ -9,52 +9,47 @@ import { Visualizer } from "./ui/Visualizer";
 import { QueueUI } from "./ui/QueueUI";
 import { INITIAL_TRACKS } from "./utils/MockData";
 
+/** Nombre del evento global que dispara AuthUI al autenticarse correctamente */
+const AUTH_SUCCESS_EVENT = "auth-success";
+
 /**
- * Clase Maestra NovaBeatApp.
- * Coordina la inicialización de servicios, seguridad y renderizado.
+ * Clase principal de NovaBeat.
+ * Orquesta la inicialización de servicios y la transición entre pantallas.
  */
 class NovaBeatApp {
-    private themeService: ThemeService;
-    private authService: AuthService;
-    private playbackQueue: PlaybackQueue<Track>;
-    private audioService: AudioService;
-    
-    private authUI: AuthUI;
-    private playerUI!: PlayerUI; // Se inicializa tras el login
+    private readonly themeService: ThemeService;
+    private readonly authService: AuthService;
+    private readonly playbackQueue: PlaybackQueue<Track>;
+    private readonly audioService: AudioService;
+    private readonly authUI: AuthUI;
+
+    private playerUI: PlayerUI | null = null;
     private visualizer: Visualizer | null = null;
     private queueUI: QueueUI | null = null;
 
     constructor() {
-        // 1. Inicialización de Capas de Lógica y Estética
         this.themeService = new ThemeService();
         this.authService = new AuthService();
         this.playbackQueue = new PlaybackQueue<Track>();
         this.audioService = new AudioService(this.playbackQueue);
 
-        // 2. Carga Inicial de la Estructura de Datos
         this.loadInitialData();
 
-        // 3. Inicialización de la Interfaz de Autenticación
-        this.authUI = new AuthUI(this.authService, this.themeService);
+        // AuthUI ya no necesita ThemeService — los estilos los gestiona ThemeService directamente
+        this.authUI = new AuthUI(this.authService);
 
-        // 4. Verificación de Seguridad para el flujo de entrada
         this.checkSession();
         this.handleGlobalEvents();
     }
 
-    /**
-     * Llena la lista doblemente enlazada con los datos de prueba.
-     */
+    /** Llena la cola con los datos de prueba al arrancar. */
     private loadInitialData(): void {
         INITIAL_TRACKS.forEach((track: Track) => {
             this.playbackQueue.addToEnd(track);
         });
-        console.log(`NovaBeat: ${this.playbackQueue.getQueueSize()} pistas cargadas.`);
     }
 
-    /**
-     * Valida si el usuario puede entrar directamente al reproductor.
-     */
+    /** Si ya existe una sesión activa, salta directamente al reproductor. */
     private checkSession(): void {
         if (this.authService.getCurrentSession()) {
             this.startAppExperience();
@@ -62,46 +57,42 @@ class NovaBeatApp {
     }
 
     /**
-     * Activa todos los sistemas visuales y de audio de NovaBeat.
-     * Se llama después de un Login exitoso o si ya había una sesión.
+     * Activa todos los sistemas visuales y de audio.
+     * Se llama tras un login exitoso o si ya había sesión persistida.
      */
     public startAppExperience(): void {
-        // Transición visual de pantallas
-        document.getElementById('auth-screen')?.classList.add('hidden');
-        document.getElementById('player-screen')?.classList.remove('hidden');
+        document.getElementById("auth-screen")?.classList.add("hidden");
+        document.getElementById("player-screen")?.classList.remove("hidden");
 
-        // Inicializar Controladores de UI
         this.playerUI = new PlayerUI(this.audioService, this.playbackQueue);
-        this.queueUI = new QueueUI(this.playbackQueue);
 
-        // Inicializar Visualizador de Ondas
-        const canvas = document.getElementById('visualizer-canvas') as HTMLCanvasElement;
+        // QueueUI recibe un callback para refrescar PlayerUI tras cada reordenamiento
+        this.queueUI = new QueueUI(this.playbackQueue, () => {
+            this.playerUI?.renderQueue();
+        });
+
+        const canvas = document.getElementById("visualizer-canvas") as HTMLCanvasElement | null;
         if (canvas) {
             this.visualizer = new Visualizer(canvas, this.audioService);
             this.visualizer.start();
         }
-
-        // Renderizado inicial de la cola
-        this.playerUI.renderQueue();
     }
 
-    /**
-     * Maneja eventos globales que no pertenecen a un componente específico.
-     */
+    /** Registra los eventos globales de la aplicación. */
     private handleGlobalEvents(): void {
-        document.getElementById('logout-btn')?.addEventListener('click', () => {
+        document.getElementById("logout-btn")?.addEventListener("click", () => {
             this.authService.logout();
+            this.visualizer?.stop();
             window.location.reload();
         });
 
-        // Evento personalizado para detectar login exitoso desde AuthUI
-        window.addEventListener('auth-success', () => {
+        window.addEventListener(AUTH_SUCCESS_EVENT, () => {
             this.startAppExperience();
         });
     }
 }
 
-// Inicialización segura al cargar el DOM
-document.addEventListener('DOMContentLoaded', () => {
-    (window as any).NovaBeat = new NovaBeatApp();
+// Arranque seguro al cargar el DOM
+document.addEventListener("DOMContentLoaded", () => {
+    new NovaBeatApp();
 });

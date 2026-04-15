@@ -1,122 +1,114 @@
 import { AuthService } from "../services/AuthService";
-import { ThemeService } from "../services/ThemeService";
+
+/** Nombre del evento global que indica autenticación exitosa */
+const AUTH_SUCCESS_EVENT = "auth-success";
+
+/** Mensajes de error centralizados */
+const ERROR_MESSAGES = {
+    LOGIN_FAILED: "Credenciales incorrectas o usuario no encontrado.",
+    REGISTER_FAILED: "Registro fallido. El correo ya existe o la contraseña es débil (mínimo 8 caracteres con letras y números).",
+    CONTAINER_NOT_FOUND: "NovaBeat Error: Contenedor de autenticación no encontrado en el DOM.",
+} as const;
 
 /**
  * Gestiona la interfaz de usuario para la autenticación en NovaBeat.
- * Crea dinámicamente los formularios siguiendo el estilo Soft Minimalist.
+ * Renderiza dinámicamente los formularios de Login y Registro.
  */
 export class AuthUI {
-    private authService: AuthService;
-    private themeService: ThemeService;
-    private container: HTMLElement;
+    private readonly authService: AuthService;
+    private readonly container: HTMLElement;
 
-    constructor(authService: AuthService, themeService: ThemeService) {
+    constructor(authService: AuthService) {
         this.authService = authService;
-        this.themeService = themeService;
-        
-        const target = document.getElementById('auth-form-container');
-        if (!target) {
-            throw new Error("NovaBeat Error: Contenedor de autenticación no encontrado.");
-        }
+
+        const target = document.getElementById("auth-form-container");
+        if (!target) throw new Error(ERROR_MESSAGES.CONTAINER_NOT_FOUND);
         this.container = target;
-        
-        // Iniciamos mostrando el login por defecto
+
         this.renderLogin();
     }
 
-    /**
-     * Renderiza el formulario de inicio de sesión.
-     */
+    /** Renderiza el formulario de inicio de sesión. */
     public renderLogin(): void {
         this.container.innerHTML = `
             <div class="auth-form fade-in">
-                <input type="email" id="login-email" placeholder="Email" class="soft-input" spellcheck="false">
-                <input type="password" id="login-pass" placeholder="Password" class="soft-input">
+                <input type="email" id="login-email" placeholder="Email" class="soft-input" spellcheck="false" autocomplete="email">
+                <input type="password" id="login-pass" placeholder="Password" class="soft-input" autocomplete="current-password">
                 <button id="btn-login" class="soft-button">Login</button>
-                <p class="toggle-text">¿No tienes cuenta? <span id="go-to-register">Regístrate</span></p>
+                <p class="toggle-text">¿No tienes cuenta? <span id="go-to-register" style="cursor:pointer;text-decoration:underline;">Regístrate</span></p>
+                <p id="auth-error" class="auth-error" style="color:red;font-size:0.85rem;min-height:1.2em;"></p>
             </div>
         `;
         this.attachLoginEvents();
     }
 
-    /**
-     * Renderiza el formulario de registro.
-     */
+    /** Renderiza el formulario de registro. */
     public renderRegister(): void {
         this.container.innerHTML = `
             <div class="auth-form fade-in">
-                <input type="text" id="reg-name" placeholder="Full Name" class="soft-input" spellcheck="false">
-                <input type="email" id="reg-email" placeholder="Email Address" class="soft-input" spellcheck="false">
-                <input type="password" id="reg-pass" placeholder="Secure Password (8+ chars)" class="soft-input">
+                <input type="text" id="reg-name" placeholder="Full Name" class="soft-input" spellcheck="false" autocomplete="name">
+                <input type="email" id="reg-email" placeholder="Email Address" class="soft-input" spellcheck="false" autocomplete="email">
+                <input type="password" id="reg-pass" placeholder="Password (8+ chars, letters & numbers)" class="soft-input" autocomplete="new-password">
                 <button id="btn-register" class="soft-button">Create Account</button>
-                <p class="toggle-text">¿Ya tienes cuenta? <span id="go-to-login">Inicia sesión</span></p>
+                <p class="toggle-text">¿Ya tienes cuenta? <span id="go-to-login" style="cursor:pointer;text-decoration:underline;">Inicia sesión</span></p>
+                <p id="auth-error" class="auth-error" style="color:red;font-size:0.85rem;min-height:1.2em;"></p>
             </div>
         `;
         this.attachRegisterEvents();
     }
 
-    /**
-     * Gestiona los eventos del formulario de Login.
-     */
-    private attachLoginEvents(): void {
-        const loginBtn = document.getElementById('btn-login');
-        const toggleLink = document.getElementById('go-to-register');
+    // ─── Eventos ─────────────────────────────────────────────────────────────
 
-        loginBtn?.addEventListener('click', () => {
-            const email = (document.getElementById('login-email') as HTMLInputElement).value;
-            const pass = (document.getElementById('login-pass') as HTMLInputElement).value;
-            
+    private attachLoginEvents(): void {
+        document.getElementById("btn-login")?.addEventListener("click", () => {
+            const email = this.getInputValue("login-email");
+            const pass = this.getInputValue("login-pass");
+
             if (this.authService.login(email, pass)) {
                 this.notifySuccess();
             } else {
-                this.showError("Credenciales incorrectas o usuario no encontrado.");
+                this.showError(ERROR_MESSAGES.LOGIN_FAILED);
             }
         });
 
-        toggleLink?.addEventListener('click', () => this.renderRegister());
+        document.getElementById("go-to-register")?.addEventListener("click", () => {
+            this.renderRegister();
+        });
     }
 
-    /**
-     * Gestiona los eventos del formulario de Registro.
-     */
     private attachRegisterEvents(): void {
-        const regBtn = document.getElementById('btn-register');
-        const toggleLink = document.getElementById('go-to-login');
+        document.getElementById("btn-register")?.addEventListener("click", () => {
+            const name = this.getInputValue("reg-name");
+            const email = this.getInputValue("reg-email");
+            const pass = this.getInputValue("reg-pass");
 
-        regBtn?.addEventListener('click', () => {
-            const name = (document.getElementById('reg-name') as HTMLInputElement).value;
-            const email = (document.getElementById('reg-email') as HTMLInputElement).value;
-            const pass = (document.getElementById('reg-pass') as HTMLInputElement).value;
-
-            // La validación se delega al AuthService que ya creamos
             if (this.authService.register(name, email, pass)) {
                 this.notifySuccess();
             } else {
-                this.showError("Registro fallido. El correo ya existe o la contraseña es débil.");
+                this.showError(ERROR_MESSAGES.REGISTER_FAILED);
             }
         });
 
-        toggleLink?.addEventListener('click', () => this.renderLogin());
+        document.getElementById("go-to-login")?.addEventListener("click", () => {
+            this.renderLogin();
+        });
     }
 
-    /**
-     * Centraliza el manejo de errores visuales.
-     */
+    // ─── Helpers privados ────────────────────────────────────────────────────
+
+    /** Obtiene el valor de un input del DOM de forma segura. */
+    private getInputValue(id: string): string {
+        return (document.getElementById(id) as HTMLInputElement)?.value?.trim() ?? "";
+    }
+
+    /** Muestra un mensaje de error inline sin bloquear la UI con alert(). */
     private showError(message: string): void {
-        // Podrías mejorar esto inyectando un div de error en el DOM
-        alert(message); 
+        const errorEl = document.getElementById("auth-error");
+        if (errorEl) errorEl.textContent = message;
     }
 
-    /**
-     * Oculta la pantalla de auth y dispara el evento global para iniciar la app.
-     */
+    /** Dispara el evento global que indica que la autenticación fue exitosa. */
     private notifySuccess(): void {
-        // Ocultamos la pantalla de autenticación
-        document.getElementById('auth-screen')?.classList.add('hidden');
-        
-        // Notificamos al main.ts que todo está listo para activar el reproductor
-        window.dispatchEvent(new CustomEvent('auth-success'));
-        
-        console.log("NovaBeat: Autenticación exitosa. Iniciando entorno musical...");
+        window.dispatchEvent(new CustomEvent(AUTH_SUCCESS_EVENT));
     }
 }

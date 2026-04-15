@@ -1,13 +1,15 @@
 import { Track } from "../models/Track.model";
 
+/** Ruta base de los recursos estáticos servidos por Vite desde /public */
+const ASSETS_BASE_URL = "/assets";
+
 /**
- * Helper para construir rutas de recursos de forma dinámica.
- * Esto evita tener URLs quemadas en toda la aplicación.
+ * Construye la ruta a un recurso de audio o portada de forma centralizada.
+ * Cambiar ASSETS_BASE_URL es suficiente para apuntar a otro servidor o CDN.
  */
-const getResourcePath = (type: 'audio' | 'cover', fileName: string): string => {
-    const BASE_URL = "/assets"; // Puedes cambiar esto a una URL de servidor o S3
-    return `${BASE_URL}/${type}/${fileName}`;
-};
+function getResourcePath(type: "audio" | "cover", fileName: string): string {
+    return `${ASSETS_BASE_URL}/${type}/${fileName}`;
+}
 
 export const INITIAL_TRACKS: Track[] = [
     {
@@ -16,9 +18,9 @@ export const INITIAL_TRACKS: Track[] = [
         artist: "Nova Echo",
         album: "Digital Horizons",
         duration: 215,
-        coverUrl: getResourcePath('cover', 'starlight-drift.jpg'),
-        audioUrl: getResourcePath('audio', 'starlight-drift.mp3'),
-        genre: "Synthwave"
+        coverUrl: getResourcePath("cover", "starlight-drift.jpg"),
+        audioUrl: getResourcePath("audio", "starlight-drift.mp3"),
+        genre: "Synthwave",
     },
     {
         id: crypto.randomUUID(),
@@ -26,8 +28,8 @@ export const INITIAL_TRACKS: Track[] = [
         artist: "Neon Dreams",
         album: "After Hours",
         duration: 180,
-        coverUrl: getResourcePath('cover', 'midnight-city.jpg'),
-        audioUrl: getResourcePath('audio', 'midnight-city.mp3'),
-        genre: "Electronic"
-    }
+        coverUrl: getResourcePath("cover", "midnight-city.jpg"),
+        audioUrl: getResourcePath("audio", "midnight-city.mp3"),
+        genre: "Electronic",
+    },
 ];

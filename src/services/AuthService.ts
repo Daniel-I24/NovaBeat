@@ -1,17 +1,27 @@
 import { User, AuthSession } from "../models/User.model";
 import { Security } from "../utils/Security";
 
+/** Claves de almacenamiento centralizadas para evitar strings dispersos */
+const STORAGE_KEYS = {
+    SESSION: "novabeat_session",
+    USERS_DB: "novabeat_users_db",
+} as const;
+
+/** Preferencias por defecto para nuevos usuarios */
+const DEFAULT_PREFERENCES: User["preferences"] = {
+    theme: "light",
+    lastVolume: 0.5,
+    autoPlay: false,
+};
+
 /**
- * Servicio encargado de la gestión de identidad y persistencia de sesión en NovaBeat.
+ * Servicio encargado de la gestión de identidad y persistencia de sesión.
+ * Abstrae el acceso a localStorage para centralizar la lógica de almacenamiento.
  */
 export class AuthService {
-    private readonly STORAGE_KEY = "novabeat_session";
-    private readonly DB_KEY = "novabeat_users_db";
-
-    constructor() {}
-
     /**
      * Registra un nuevo usuario en el sistema.
+     * Retorna false si el email ya existe o los datos no son válidos.
      */
     public register(fullName: string, email: string, password: string): boolean {
         if (!Security.isValidEmail(email) || !Security.isSecurePassword(password)) {
@@ -19,7 +29,8 @@ export class AuthService {
         }
 
         const users = this.getStoredUsers();
-        if (users.find(u => u.email === email)) return false;
+        const emailAlreadyExists = users.some((u) => u.email === email);
+        if (emailAlreadyExists) return false;
 
         const newUser: User = {
             id: crypto.randomUUID(),
@@ -27,61 +38,64 @@ export class AuthService {
             email,
             passwordHash: Security.hashPassword(password),
             createdAt: Date.now(),
-            preferences: {
-                theme: 'light',
-                lastVolume: 0.5,
-                autoPlay: false
-            }
+            preferences: { ...DEFAULT_PREFERENCES },
         };
 
-        users.push(newUser);
-        localStorage.setItem(this.DB_KEY, JSON.stringify(users));
+        this.saveUsers([...users, newUser]);
         return this.login(email, password);
     }
 
     /**
-     * Autentica al usuario y crea una sesión persistente.
+     * Autentica al usuario y persiste la sesión en localStorage.
+     * Retorna true si las credenciales son correctas.
      */
     public login(email: string, password: string): boolean {
         const users = this.getStoredUsers();
         const hashedPassword = Security.hashPassword(password);
-        
-        const user = users.find(u => u.email === email && u.passwordHash === hashedPassword);
+        const user = users.find(
+            (u) => u.email === email && u.passwordHash === hashedPassword
+        );
 
-        if (user) {
-            const session: AuthSession = {
-                token: Security.generateToken(),
-                user: {
-                    id: user.id,
-                    fullName: user.fullName,
-                    email: user.email,
-                    createdAt: user.createdAt,
-                    preferences: user.preferences
-                }
-            };
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(session));
-            return true;
-        }
-        return false;
+        if (!user) return false;
+
+        const session: AuthSession = {
+            token: Security.generateToken(),
+            user: {
+                id: user.id,
+                fullName: user.fullName,
+                email: user.email,
+                createdAt: user.createdAt,
+                preferences: user.preferences,
+            },
+        };
+
+        this.saveSession(session);
+        return true;
     }
 
-    /**
-     * Retorna la sesión actual si existe.
-     */
+    /** Retorna la sesión activa o null si no existe. */
     public getCurrentSession(): AuthSession | null {
-        const data = localStorage.getItem(this.STORAGE_KEY);
-        return data ? JSON.parse(data) : null;
+        const data = localStorage.getItem(STORAGE_KEYS.SESSION);
+        return data ? (JSON.parse(data) as AuthSession) : null;
     }
 
-    /**
-     * Finaliza la sesión actual.
-     */
+    /** Elimina la sesión activa del almacenamiento. */
     public logout(): void {
-        localStorage.removeItem(this.STORAGE_KEY);
+        localStorage.removeItem(STORAGE_KEYS.SESSION);
     }
+
+    // ─── Métodos privados de acceso al almacenamiento ───────────────────────
 
     private getStoredUsers(): User[] {
-        const data = localStorage.getItem(this.DB_KEY);
-        return data ? JSON.parse(data) : [];
+        const data = localStorage.getItem(STORAGE_KEYS.USERS_DB);
+        return data ? (JSON.parse(data) as User[]) : [];
+    }
+
+    private saveUsers(users: User[]): void {
+        localStorage.setItem(STORAGE_KEYS.USERS_DB, JSON.stringify(users));
+    }
+
+    private saveSession(session: AuthSession): void {
+        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(session));
     }
 }

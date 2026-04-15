@@ -1,22 +1,33 @@
 /**
- * Servicio maestro de estética para NovaBeat.
- * Centraliza todo el diseño mediante CSS-in-TS, permitiendo un proyecto sin archivos .css.
+ * Servicio de estética para NovaBeat.
+ * Inyecta los estilos globales en el DOM y expone métodos para personalización dinámica.
  */
 export class ThemeService {
-    private styleElement: HTMLStyleElement;
+    private readonly styleElement: HTMLStyleElement;
 
     constructor() {
-        this.styleElement = document.createElement('style');
-        this.styleElement.id = 'novabeat-theme-engine';
+        this.styleElement = document.createElement("style");
+        this.styleElement.id = "novabeat-theme-engine";
         document.head.appendChild(this.styleElement);
-        this.applyNovaBeatStyles();
+        this.applyStyles();
     }
 
     /**
-     * Inyecta la hoja de estilos completa en el DOM.
-     * Incluye configuraciones para Soft Minimalist, Glassmorphism y animaciones.
+     * Actualiza el color de acento dinámicamente (p.ej. según la portada del álbum).
+     * @param hexColor Color en formato hexadecimal, ej: "#6c5ce7"
      */
-    private applyNovaBeatStyles(): void {
+    public setDynamicAccent(hexColor: string): void {
+        const root = document.documentElement;
+        root.style.setProperty("--accent", hexColor);
+        // Construimos la versión suave con opacidad 10% usando rgba para mayor claridad
+        const r = parseInt(hexColor.slice(1, 3), 16);
+        const g = parseInt(hexColor.slice(3, 5), 16);
+        const b = parseInt(hexColor.slice(5, 7), 16);
+        root.style.setProperty("--accent-soft", `rgba(${r}, ${g}, ${b}, 0.1)`);
+    }
+
+    /** Inyecta la hoja de estilos completa en el DOM. */
+    private applyStyles(): void {
         this.styleElement.innerHTML = `
             :root {
                 --bg-main: #f0f3f7;
@@ -27,7 +38,7 @@ export class ThemeService {
                 --text-dark: #2d3436;
                 --text-light: #636e72;
                 --shadow-main: 0 15px 35px rgba(0, 0, 0, 0.05);
-                --shadow-inner: inset 5px 5px 10px rgba(0,0,0,0.02);
+                --shadow-inner: inset 5px 5px 10px rgba(0, 0, 0, 0.02);
             }
 
             /* Reset y Base */
@@ -133,7 +144,7 @@ export class ThemeService {
                 font-size: 1.4rem;
                 cursor: pointer;
                 transition: 0.3s;
-                box-shadow: 5px 5px 15px rgba(0,0,0,0.05);
+                box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.05);
             }
 
             .control-btn:hover {
@@ -180,7 +191,7 @@ export class ThemeService {
                 transform: translateX(5px);
             }
 
-            /* Barra de Progreso Custom */
+            /* Barra de Progreso */
             input[type="range"] {
                 -webkit-appearance: none;
                 width: 100%;
@@ -206,24 +217,16 @@ export class ThemeService {
 
             @keyframes fadeIn {
                 from { opacity: 0; transform: translateY(20px); }
-                to { opacity: 1; transform: translateY(0); }
+                to   { opacity: 1; transform: translateY(0); }
             }
 
             /* Scrollbar minimalista */
             #playback-queue-list::-webkit-scrollbar { width: 5px; }
             #playback-queue-list::-webkit-scrollbar-track { background: transparent; }
-            #playback-queue-list::-webkit-scrollbar-thumb { 
-                background: var(--accent-soft); 
-                border-radius: 10px; 
+            #playback-queue-list::-webkit-scrollbar-thumb {
+                background: var(--accent-soft);
+                border-radius: 10px;
             }
         `;
-    }
-
-    /**
-     * Permite actualizar el color de acento según la carátula de la canción.
-     */
-    public setDynamicAccent(hexColor: string): void {
-        document.documentElement.style.setProperty('--accent', hexColor);
-        document.documentElement.style.setProperty('--accent-soft', hexColor + '22'); // 22 es opacidad en hex
     }
 }
