@@ -1,20 +1,19 @@
 /**
- * Define la estructura de una canción dentro de NovaBeat.
- * Se utilizan tipos estrictos para garantizar la integridad de los datos.
+ * Representa una pista de audio en el catálogo de NovaBeat.
  */
 export interface Track {
-    id: string;          // UUID único para cada canción
-    title: string;       // Nombre de la pista
-    artist: string;      // Artista o banda
-    album: string;       // Álbum al que pertenece
-    duration: number;    // Duración total en segundos
-    coverUrl: string;    // Ruta a la imagen de la carátula (para el Soft Minimalist design)
-    audioUrl: string;    // Ruta al archivo de audio (.mp3, .wav)
-    genre: string;       // Género musical para posibles filtros
+    id: string;
+    title: string;
+    artist: string;
+    album: string;
+    duration: number;   // en segundos
+    coverUrl: string;
+    audioUrl: string;
+    genre: string;
 }
 
 /**
- * Representa el estado actual de la reproducción.
+ * Estado interno del motor de reproducción.
  */
 export interface PlaybackState {
     isPlaying: boolean;

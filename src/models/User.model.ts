@@ -1,29 +1,34 @@
 /**
- * Estructura de usuario para el sistema de autenticación de NovaBeat.
- */
-export interface User {
-    id: string;
-    fullName: string;
-    email: string;
-    passwordHash: string; // Almacenado de forma segura, nunca en texto plano
-    profilePicture?: string;
-    preferences: UserPreferences;
-    createdAt: number;    // Timestamp de registro
-}
-
-/**
- * Preferencias de usuario para persistir el estilo Soft Minimalist y la configuración.
+ * Preferencias de usuario persistidas en Firestore.
  */
 export interface UserPreferences {
-    theme: 'light' | 'dark';
+    theme: string;
     lastVolume: number;
     autoPlay: boolean;
 }
 
 /**
- * Objeto que se guarda en la sesión activa del navegador.
+ * Perfil de usuario almacenado en Firestore (colección "users").
+ * No contiene passwordHash — Firebase Auth gestiona las credenciales.
+ */
+export interface UserProfile {
+    uid: string;
+    fullName: string;
+    email: string;
+    photoURL: string | null;
+    provider: "email" | "google";
+    createdAt: number;
+    preferences: UserPreferences;
+}
+
+/**
+ * Sesión activa del usuario en memoria (no persiste en localStorage).
+ * Firebase Auth maneja la persistencia de sesión internamente.
  */
 export interface AuthSession {
-    token: string;
-    user: Omit<User, 'passwordHash'>; // Excluimos el hash por seguridad en el frontend
+    uid: string;
+    fullName: string;
+    email: string;
+    photoURL: string | null;
+    provider: "email" | "google";
 }

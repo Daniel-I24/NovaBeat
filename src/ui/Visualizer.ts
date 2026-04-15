@@ -29,9 +29,18 @@ export class Visualizer {
         window.addEventListener("resize", () => this.resize());
     }
 
-    /** Inicia el ciclo de animación de la onda. */
+    /** Inicia el ciclo de animación de la onda. Se llama tras la primera interacción del usuario. */
     public start(): void {
-        const analyzer = this.audioService.getAnalyzer();
+        // Obtenemos el analyzer de forma lazy — esto crea el AudioContext
+        // solo cuando el usuario ya interactuó con la página
+        let analyzer: AnalyserNode;
+        try {
+            analyzer = this.audioService.getAnalyzer();
+        } catch {
+            // Si Web Audio no está disponible, el visualizador simplemente no dibuja
+            return;
+        }
+
         const dataArray = new Uint8Array(analyzer.frequencyBinCount);
 
         const draw = (): void => {

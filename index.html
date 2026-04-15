@@ -1,41 +1,65 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NovaBeat | Premium Music Experience</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./public/styles/main.css">
+    <title>NovaBeat</title>
+    <meta name="description" content="NovaBeat — Tu experiencia musical premium">
 </head>
 <body>
     <div id="app-container">
         <canvas id="visualizer-canvas"></canvas>
 
-        <section id="auth-screen" class="glass-container">
-            <div class="auth-content">
-                <h1 class="logo">NovaBeat</h1>
-                <p class="subtitle">Elevate your rhythm</p>
-                <div id="auth-form-container">
-                    </div>
+        <!-- ── Pantalla de Autenticación ── -->
+        <section id="auth-screen">
+            <div class="auth-card glass-panel fade-in">
+                <h1 class="auth-logo">NovaBeat</h1>
+                <p class="auth-subtitle">Tu experiencia musical premium</p>
+                <div id="auth-form-container"></div>
             </div>
         </section>
 
+        <!-- ── Pantalla del Reproductor ── -->
         <main id="player-screen" class="hidden">
-            <header class="player-header">
-                <span id="user-greeting">Welcome</span>
-                <button id="logout-btn" class="icon-btn">Logout</button>
+
+            <!-- Header -->
+            <header class="player-header glass-panel">
+                <div class="header-left">
+                    <span class="app-logo">NovaBeat</span>
+                    <span class="user-greeting" id="user-greeting">Bienvenido</span>
+                    <img id="user-avatar" class="user-avatar hidden" src="" alt="Avatar">
+                </div>
+                <div class="header-right">
+                    <!-- Theme Picker -->
+                    <div class="theme-picker">
+                        <div class="theme-dot" data-theme="midnight-dark" title="Midnight Dark"></div>
+                        <div class="theme-dot" data-theme="neon-synthwave" title="Neon Synthwave"></div>
+                        <div class="theme-dot" data-theme="soft-minimalist" title="Soft Minimalist"></div>
+                        <div class="theme-dot" data-theme="forest-calm" title="Forest Calm"></div>
+                        <div class="theme-dot" data-theme="sunset-warm" title="Sunset Warm"></div>
+                        <div class="theme-dot" data-theme="ocean-deep" title="Ocean Deep"></div>
+                    </div>
+                    <button id="search-btn" class="icon-btn" title="Buscar en Jamendo">🔍 Buscar música</button>
+                    <button id="upload-btn" class="icon-btn" title="Subir canciones desde tu PC">＋ Agregar música</button>
+                    <input type="file" id="file-input" accept="audio/*" multiple style="display:none">
+                    <button id="logout-btn" class="icon-btn">Salir</button>
+                </div>
             </header>
 
-            <section class="main-content">
-                <div class="now-playing glass-container">
-                    <div class="album-art-container">
-                        <img id="current-cover" src="" alt="Album Art">
+            <!-- Cuerpo principal -->
+            <div class="player-body">
+
+                <!-- Now Playing -->
+                <div class="now-playing glass-panel">
+                    <div class="album-art-wrapper">
+                        <img id="current-cover" src="https://placehold.co/200x200/1a1a2e/7c6ff7?text=♪" alt="Portada">
                     </div>
+
                     <div class="track-info">
-                        <h2 id="current-title">Track Title</h2>
-                        <p id="current-artist">Artist Name</p>
+                        <h2 id="current-title">Selecciona una canción</h2>
+                        <p id="current-artist">—</p>
                     </div>
-                    
+
                     <div class="progress-area">
                         <input type="range" id="progress-bar" min="0" value="0" step="1">
                         <div class="time-info">
@@ -45,19 +69,65 @@
                     </div>
 
                     <div class="controls">
-                        <button id="prev-btn" class="control-btn">⏮</button>
-                        <button id="play-pause-btn" class="control-btn play">▶</button>
-                        <button id="next-btn" class="control-btn">⏭</button>
+                        <button id="prev-btn" class="control-btn" title="Anterior">⏮</button>
+                        <button id="play-pause-btn" class="control-btn play" title="Play/Pause">▶</button>
+                        <button id="next-btn" class="control-btn" title="Siguiente">⏭</button>
+                    </div>
+
+                    <div class="volume-area">
+                        <span class="volume-icon">🔈</span>
+                        <input type="range" id="volume-bar" min="0" max="1" step="0.01" value="0.7">
+                        <span class="volume-icon">🔊</span>
                     </div>
                 </div>
 
-                <aside class="queue-section glass-container">
-                    <h3>Up Next</h3>
-                    <ul id="playback-queue-list">
-                        </ul>
+                <!-- Cola de reproducción -->
+                <aside class="queue-section glass-panel">
+                    <div class="queue-header">
+                        <h3 class="queue-title">Cola de reproducción</h3>
+                        <span class="queue-count" id="queue-count">0 canciones</span>
+                    </div>
+                    <ul id="playback-queue-list"></ul>
                 </aside>
-            </section>
+
+            </div>
         </main>
+
+        <!-- Toast notifications -->
+        <div class="toast-container" id="toast-container"></div>
+
+        <!-- Search overlay -->
+        <div id="search-overlay" class="hidden"></div>
+
+        <!-- Search Panel (Jamendo) -->
+        <aside id="search-panel" class="glass-panel">
+            <div class="search-panel-header">
+                <h3 class="search-panel-title">🎵 Buscar en Jamendo</h3>
+                <button id="search-close-btn" class="icon-btn" onclick="document.getElementById('search-panel').classList.remove('open');document.getElementById('search-overlay').classList.add('hidden')">✕</button>
+            </div>
+
+            <input type="text" id="search-input" class="soft-input search-input-field"
+                   placeholder="Buscar artista, canción, álbum...">
+
+            <!-- Filtros de género -->
+            <div class="genre-chips">
+                <button class="genre-chip" data-genre="electronic">Electronic</button>
+                <button class="genre-chip" data-genre="rock">Rock</button>
+                <button class="genre-chip" data-genre="pop">Pop</button>
+                <button class="genre-chip" data-genre="jazz">Jazz</button>
+                <button class="genre-chip" data-genre="classical">Classical</button>
+                <button class="genre-chip" data-genre="ambient">Ambient</button>
+                <button class="genre-chip" data-genre="hiphop">Hip-Hop</button>
+                <button class="genre-chip" data-genre="folk">Folk</button>
+            </div>
+
+            <p id="search-results-title" class="search-results-title">🔥 Trending</p>
+            <div id="search-results" class="search-results-list"></div>
+
+            <p class="jamendo-credit">
+                Música por <a href="https://www.jamendo.com" target="_blank" rel="noopener">Jamendo</a> · Licencia Creative Commons
+            </p>
+        </aside>
     </div>
 
     <script type="module" src="/src/main.ts"></script>
