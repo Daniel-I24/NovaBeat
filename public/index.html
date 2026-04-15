@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NovaBeat | Premium Music Experience</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles/main.css">
+</head>
+<body>
+    <div id="app-container">
+        <canvas id="visualizer-canvas"></canvas>
+
+        <section id="auth-screen" class="glass-container">
+            <div class="auth-content">
+                <h1 class="logo">NovaBeat</h1>
+                <p class="subtitle">Elevate your rhythm</p>
+                <div id="auth-form-container">
+                    </div>
+            </div>
+        </section>
+
+        <main id="player-screen" class="hidden">
+            <header class="player-header">
+                <span id="user-greeting">Welcome</span>
+                <button id="logout-btn" class="icon-btn">Logout</button>
+            </header>
+
+            <section class="main-content">
+                <div class="now-playing glass-container">
+                    <div class="album-art-container">
+                        <img id="current-cover" src="" alt="Album Art">
+                    </div>
+                    <div class="track-info">
+                        <h2 id="current-title">Track Title</h2>
+                        <p id="current-artist">Artist Name</p>
+                    </div>
+                    
+                    <div class="progress-area">
+                        <input type="range" id="progress-bar" min="0" value="0" step="1">
+                        <div class="time-info">
+                            <span id="current-time">0:00</span>
+                            <span id="total-duration">0:00</span>
+                        </div>
+                    </div>
+
+                    <div class="controls">
+                        <button id="prev-btn" class="control-btn">⏮</button>
+                        <button id="play-pause-btn" class="control-btn play">▶</button>
+                        <button id="next-btn" class="control-btn">⏭</button>
+                    </div>
+                </div>
+
+                <aside class="queue-section glass-container">
+                    <h3>Up Next</h3>
+                    <ul id="playback-queue-list">
+                        </ul>
+                </aside>
+            </section>
+        </main>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
