@@ -114,7 +114,8 @@ export class JamendoService {
             duration: raw.duration,
             genre: raw.genre ?? "Various",
             coverUrl: raw.image || "https://placehold.co/200x200/0d0d1a/7c6ff7?text=♪",
-            audioUrl: raw.audio,
+            // audiodownload es la URL directa de descarga/stream con CORS abierto
+            audioUrl: `https://mp3d.jamendo.com/?trackid=${raw.id}&format=mp32`,
         };
     }
 }

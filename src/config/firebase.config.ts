@@ -1,17 +1,21 @@
-import { initializeApp, FirebaseApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
+/**
+ * Credenciales cargadas desde variables de entorno (.env).
+ * Nunca hardcodear claves en el código fuente.
+ */
 const firebaseConfig = {
-    apiKey: "AIzaSyCOmsa3iFlvLZushP0EYSDWKFYB8z5qlaU",
-    authDomain: "novabeat-aac92.firebaseapp.com",
-    projectId: "novabeat-aac92",
-    storageBucket: "novabeat-aac92.firebasestorage.app",
-    messagingSenderId: "457159685574",
-    appId: "1:457159685574:web:9b5044dfe7c45b97122ec7",
+    apiKey:            import.meta.env.VITE_FIREBASE_API_KEY as string,
+    authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
+    projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
+    storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+    appId:             import.meta.env.VITE_FIREBASE_APP_ID as string,
 };
 
-const app: FirebaseApp = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 
-export const auth: Auth = getAuth(app);
-export const db: Firestore = getFirestore(app);
+export const auth = getAuth(app);
+export const db   = getFirestore(app);

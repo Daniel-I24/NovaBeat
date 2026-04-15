@@ -101,11 +101,15 @@ export class PlaybackQueue<T> {
         return current;
     }
 
-    public getQueueSize(): number {
-        return this.totalTracks;
-    }
+    public getQueueSize(): number { return this.totalTracks; }
 
-    public getFirstTrack(): TrackNode<T> | null {
-        return this.firstTrack;
+    public getFirstTrack(): TrackNode<T> | null { return this.firstTrack; }
+
+    /** Convierte la lista enlazada en un array plano. */
+    public toArray(): T[] {
+        const result: T[] = [];
+        let node = this.firstTrack;
+        while (node) { result.push(node.trackData); node = node.nextTrack; }
+        return result;
     }
 }

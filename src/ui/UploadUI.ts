@@ -2,8 +2,8 @@ import { PlaybackQueue } from "../assets/core/PlaybackQueue";
 import { Track } from "../models/Track.model";
 
 /**
- * Gestiona la carga de archivos de audio locales desde el PC del usuario.
- * Crea URLs de objeto temporal (blob) para reproducción inmediata sin servidor.
+ * Gestiona la carga de archivos de audio locales.
+ * Usa blob URLs para reproducción inmediata sin servidor.
  */
 export class UploadUI {
     private readonly queue: PlaybackQueue<Track>;
@@ -12,83 +12,70 @@ export class UploadUI {
     constructor(queue: PlaybackQueue<Track>, onTracksAdded: () => void) {
         this.queue = queue;
         this.onTracksAdded = onTracksAdded;
-        this.setupUploadButton();
+        this.setup();
     }
 
-    private setupUploadButton(): void {
-        const btn = document.getElementById("upload-btn");
-        const input = document.getElementById("file-input") as HTMLInputElement | null;
+    private setup(): void {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "audio/*";
+        input.multiple = true;
+        input.style.display = "none";
+        document.body.appendChild(input);
 
-        btn?.addEventListener("click", () => input?.click());
+        // Reemplazar el input del HTML con uno creado programáticamente
+        // para evitar el doble disparo del evento change en algunos navegadores
+        const htmlInput = document.getElementById("file-input");
+        htmlInput?.replaceWith(input);
+        input.id = "file-input";
 
-        input?.addEventListener("change", () => {
-            const files = input.files;
-            if (!files || files.length === 0) return;
+        document.getElementById("upload-btn")?.addEventListener("click", () => input.click());
+
+        input.addEventListener("change", (e) => {
+            const files = (e.target as HTMLInputElement).files;
+            if (!files?.length) return;
             this.processFiles(Array.from(files));
-            input.value = ""; // Permite volver a subir el mismo archivo
+            // Resetear usando un nuevo input para garantizar que change se dispare siempre
+            input.value = "";
         });
 
-        // Drag & drop sobre toda la pantalla del reproductor
-        const playerScreen = document.getElementById("player-screen");
-        playerScreen?.addEventListener("dragover", (e) => {
+        // Drag & drop
+        const screen = document.getElementById("player-screen");
+        screen?.addEventListener("dragover", (e) => { e.preventDefault(); screen.classList.add("drag-over"); });
+        screen?.addEventListener("dragleave", () => screen.classList.remove("drag-over"));
+        screen?.addEventListener("drop", (e: DragEvent) => {
             e.preventDefault();
-            playerScreen.classList.add("drag-over");
-        });
-
-        playerScreen?.addEventListener("dragleave", () => {
-            playerScreen.classList.remove("drag-over");
-        });
-
-        playerScreen?.addEventListener("drop", (e: DragEvent) => {
-            e.preventDefault();
-            playerScreen.classList.remove("drag-over");
-            const files = Array.from(e.dataTransfer?.files ?? []).filter(
-                (f) => f.type.startsWith("audio/")
-            );
-            if (files.length > 0) this.processFiles(files);
+            screen.classList.remove("drag-over");
+            const files = Array.from(e.dataTransfer?.files ?? []).filter((f) => f.type.startsWith("audio/"));
+            if (files.length) this.processFiles(files);
         });
     }
 
-    /**
-     * Convierte archivos de audio en Track objects usando blob URLs.
-     * Lee los metadatos del nombre del archivo como fallback.
-     */
     private processFiles(files: File[]): void {
-        files.forEach((file) => {
-            if (!file.type.startsWith("audio/")) return;
-
-            const blobUrl = URL.createObjectURL(file);
-            const { title, artist } = this.parseFileName(file.name);
-
-            const track: Track = {
+        let added = 0;
+        for (const file of files) {
+            if (!file.type.startsWith("audio/")) continue;
+            const { title, artist } = this.parseName(file.name);
+            this.queue.addToEnd({
                 id: crypto.randomUUID(),
                 title,
                 artist,
                 album: "Biblioteca local",
-                duration: 0, // Se actualiza cuando el audio carga
+                duration: 0,
                 genre: "Local",
                 coverUrl: "https://placehold.co/200x200/1a1a2e/7c6ff7?text=♪",
-                audioUrl: blobUrl,
-            };
-
-            this.queue.addToEnd(track);
-        });
-
-        this.onTracksAdded();
+                audioUrl: URL.createObjectURL(file),
+            });
+            added++;
+        }
+        if (added > 0) this.onTracksAdded();
     }
 
-    /**
-     * Intenta extraer título y artista del nombre del archivo.
-     * Soporta el formato "Artista - Título.mp3".
-     */
-    private parseFileName(fileName: string): { title: string; artist: string } {
-        const nameWithoutExt = fileName.replace(/\.[^/.]+$/, "");
-        const parts = nameWithoutExt.split(" - ");
-
-        if (parts.length >= 2) {
-            return { artist: parts[0].trim(), title: parts[1].trim() };
-        }
-
-        return { title: nameWithoutExt, artist: "Artista desconocido" };
+    private parseName(fileName: string): { title: string; artist: string } {
+        const name  = fileName.replace(/\.[^/.]+$/, "");
+        const parts = name.split(" - ");
+        return parts.length >= 2
+            ? { artist: parts[0].trim(), title: parts[1].trim() }
+            : { title: name, artist: "Artista desconocido" };
     }
 }

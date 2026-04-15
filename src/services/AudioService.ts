@@ -2,29 +2,19 @@ import { PlaybackQueue } from "../assets/core/PlaybackQueue";
 import { TrackNode } from "../assets/core/TrackNode";
 import { Track, PlaybackState } from "../models/Track.model";
 
-const UI_UPDATE_INTERVAL_MS = 500;
+const UI_UPDATE_INTERVAL_MS = 250; // más frecuente para seek preciso
 const DEFAULT_VOLUME = 0.7;
 
 /**
  * Servicio de audio de NovaBeat.
- *
- * Arquitectura de audio:
- *   HTMLAudioElement  →  reproduce el audio (siempre conectado al destino del navegador)
- *   AudioContext      →  se crea SOLO cuando el visualizador lo solicita, en ese momento
- *                        se inserta en la cadena: AudioElement → Analyser → Destination
- *
- * Separar la creación del AudioContext del constructor evita el problema donde
- * createMediaElementSource() desconecta el audio del destino por defecto antes
- * de que el contexto esté listo, resultando en audio silencioso.
+ * HTMLAudioElement maneja la reproducción directamente.
+ * AudioContext se crea de forma lazy solo cuando el visualizador lo necesita.
  */
 export class AudioService {
     private readonly audioElement: HTMLAudioElement;
-
-    // AudioContext y nodos — se inicializan lazy cuando el visualizador los pide
     private audioContext: AudioContext | null = null;
     private analyzer: AnalyserNode | null = null;
     private sourceConnected = false;
-
     private currentTrackNode: TrackNode<Track> | null = null;
 
     private state: PlaybackState = {
@@ -37,21 +27,16 @@ export class AudioService {
     constructor(_queue: PlaybackQueue<Track>) {
         this.audioElement = new Audio();
         this.audioElement.volume = DEFAULT_VOLUME;
-        this.audioElement.crossOrigin = "anonymous"; // Necesario para Web Audio API con URLs externas
+        this.audioElement.preload = "metadata";
         this.setupListeners();
     }
 
     // ─── Reproducción ─────────────────────────────────────────────────────────
 
-    /** Carga y reproduce una pista. Reanuda el AudioContext si existe. */
     public async playTrack(node: TrackNode<Track>): Promise<void> {
         this.currentTrackNode = node;
         this.audioElement.src = node.trackData.audioUrl;
-
-        if (this.audioContext?.state === "suspended") {
-            await this.audioContext.resume();
-        }
-
+        await this.resumeContext();
         try {
             await this.audioElement.play();
             this.state.isPlaying = true;
@@ -61,97 +46,95 @@ export class AudioService {
         }
     }
 
-    /** Alterna entre play y pause. */
     public async togglePlay(): Promise<void> {
-        if (this.state.isPlaying) {
-            this.audioElement.pause();
-            this.state.isPlaying = false;
-        } else {
-            if (this.audioContext?.state === "suspended") {
-                await this.audioContext.resume();
-            }
+        if (this.audioElement.paused) {
+            await this.resumeContext();
             try {
                 await this.audioElement.play();
                 this.state.isPlaying = true;
-            } catch (err) {
-                console.error("NovaBeat: Error al reanudar:", err);
-            }
+            } catch { /* silencioso */ }
+        } else {
+            this.audioElement.pause();
+            this.state.isPlaying = false;
         }
+    }
+
+    /** Salta a un tiempo específico en segundos. */
+    public seekTo(seconds: number): void {
+        if (!isFinite(seconds)) return;
+        this.audioElement.currentTime = Math.max(0, Math.min(seconds, this.audioElement.duration || 0));
     }
 
     public async playNext(): Promise<void> {
-        if (this.currentTrackNode?.nextTrack) {
-            await this.playTrack(this.currentTrackNode.nextTrack);
-        }
+        if (this.currentTrackNode?.nextTrack) await this.playTrack(this.currentTrackNode.nextTrack);
     }
 
     public async playPrevious(): Promise<void> {
-        if (this.currentTrackNode?.previousTrack) {
-            await this.playTrack(this.currentTrackNode.previousTrack);
-        }
+        if (this.currentTrackNode?.previousTrack) await this.playTrack(this.currentTrackNode.previousTrack);
+    }
+
+    public stop(): void {
+        this.audioElement.pause();
+        this.audioElement.src = "";
+        this.state = { isPlaying: false, currentTime: 0, volume: this.state.volume, isMuted: false };
+        this.currentTrackNode = null;
     }
 
     public setVolume(value: number): void {
-        const volume = Math.max(0, Math.min(1, value));
-        this.audioElement.volume = volume;
-        this.state.volume = volume;
+        const v = Math.max(0, Math.min(1, value));
+        this.audioElement.volume = v;
+        this.state.volume = v;
     }
 
     // ─── Web Audio API (lazy) ─────────────────────────────────────────────────
 
-    /**
-     * Inicializa el AudioContext y conecta el AnalyserNode.
-     * Se llama SOLO desde Visualizer, después de una interacción del usuario.
-     * Retorna el AnalyserNode para que Visualizer lea las frecuencias.
-     */
     public getAnalyzer(): AnalyserNode {
         if (this.analyzer) return this.analyzer;
 
-        const AudioContextClass =
-            window.AudioContext ??
+        const Ctx = window.AudioContext ??
             (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!Ctx) throw new Error("Web Audio API no soportada.");
 
-        if (!AudioContextClass) {
-            throw new Error("NovaBeat: Web Audio API no soportada en este navegador.");
-        }
-
-        this.audioContext = new AudioContextClass();
+        this.audioContext = new Ctx();
         this.analyzer = this.audioContext.createAnalyser();
-        this.analyzer.fftSize = 512; // Más eficiente que el default 2048
+        this.analyzer.fftSize = 128;
 
-        // Conectar solo una vez
         if (!this.sourceConnected) {
-            const source = this.audioContext.createMediaElementSource(this.audioElement);
-            source.connect(this.analyzer);
+            this.audioElement.crossOrigin = "anonymous";
+            const src = this.audioContext.createMediaElementSource(this.audioElement);
+            src.connect(this.analyzer);
             this.analyzer.connect(this.audioContext.destination);
             this.sourceConnected = true;
         }
-
         return this.analyzer;
     }
 
     // ─── Estado ───────────────────────────────────────────────────────────────
 
     public getState(): PlaybackState {
-        return { ...this.state };
+        // Leer directamente del elemento para máxima precisión
+        return {
+            isPlaying: !this.audioElement.paused && !this.audioElement.ended,
+            currentTime: this.audioElement.currentTime,
+            volume: this.audioElement.volume,
+            isMuted: this.audioElement.muted,
+        };
     }
 
-    public getCurrentTrackNode(): TrackNode<Track> | null {
-        return this.currentTrackNode;
-    }
+    public getDuration(): number { return this.audioElement.duration || 0; }
 
-    public static get UI_UPDATE_INTERVAL(): number {
-        return UI_UPDATE_INTERVAL_MS;
-    }
+    public getCurrentTrackNode(): TrackNode<Track> | null { return this.currentTrackNode; }
+
+    public static get UI_UPDATE_INTERVAL(): number { return UI_UPDATE_INTERVAL_MS; }
 
     // ─── Privados ─────────────────────────────────────────────────────────────
 
+    private async resumeContext(): Promise<void> {
+        if (this.audioContext?.state === "suspended") await this.audioContext.resume();
+    }
+
     private setupListeners(): void {
-        this.audioElement.onended = () => {
-            void this.playNext();
-        };
-        this.audioElement.ontimeupdate = () => {
-            this.state.currentTime = this.audioElement.currentTime;
-        };
+        this.audioElement.onended = () => void this.playNext();
+        this.audioElement.ontimeupdate = () => { this.state.currentTime = this.audioElement.currentTime; };
     }
 }

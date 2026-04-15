@@ -121,20 +121,25 @@ export class FirebaseAuthService {
         fullName: string,
         provider: "email" | "google"
     ): Promise<void> {
-        const ref = doc(db, "users", user.uid);
-        const existing = await getDoc(ref);
-        if (existing.exists()) return;
+        try {
+            const ref = doc(db, "users", user.uid);
+            const existing = await getDoc(ref);
+            if (existing.exists()) return;
 
-        const profile = {
-            fullName,
-            email: user.email ?? "",
-            photoURL: user.photoURL,
-            provider,
-            createdAt: serverTimestamp(),
-            preferences: { ...DEFAULT_PREFERENCES },
-        };
+            const profile = {
+                fullName,
+                email: user.email ?? "",
+                photoURL: user.photoURL,
+                provider,
+                createdAt: serverTimestamp(),
+                preferences: { ...DEFAULT_PREFERENCES },
+            };
 
-        await setDoc(ref, profile);
+            await setDoc(ref, profile);
+        } catch (err) {
+            // Si Firestore falla (reglas, red), el login igual continúa
+            console.warn("NovaBeat: No se pudo crear el perfil en Firestore:", err);
+        }
     }
 
     /**
@@ -142,20 +147,61 @@ export class FirebaseAuthService {
      */
     public async getUserPreferences(): Promise<UserPreferences> {
         if (!this.currentSession) return { ...DEFAULT_PREFERENCES };
-        const ref = doc(db, "users", this.currentSession.uid);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) return { ...DEFAULT_PREFERENCES };
-        const data = snap.data() as UserProfile;
-        return data.preferences ?? { ...DEFAULT_PREFERENCES };
+        try {
+            const ref = doc(db, "users", this.currentSession.uid);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return { ...DEFAULT_PREFERENCES };
+            const data = snap.data() as UserProfile;
+            return data.preferences ?? { ...DEFAULT_PREFERENCES };
+        } catch {
+            return { ...DEFAULT_PREFERENCES };
+        }
+    }
+
+    public async savePreferences(prefs: Partial<UserPreferences>): Promise<void> {
+        if (!this.currentSession) return;
+        try {
+            const ref = doc(db, "users", this.currentSession.uid);
+            await setDoc(ref, { preferences: prefs }, { merge: true });
+        } catch (err) {
+            console.warn("NovaBeat: No se pudieron guardar las preferencias:", err);
+        }
+    }
+
+    // ─── Historial de canciones ───────────────────────────────────────────────
+
+    /**
+     * Guarda el historial de canciones del usuario en Firestore.
+     * Solo guarda canciones con URL permanente (no blob URLs locales).
+     */
+    public async saveTrackHistory(tracks: import("../models/Track.model").Track[]): Promise<void> {
+        if (!this.currentSession) return;
+        try {
+            // Filtrar blob URLs — no se pueden persistir entre sesiones
+            const persistable = tracks
+                .filter((t) => !t.audioUrl.startsWith("blob:"))
+                .slice(0, 50); // máximo 50 canciones guardadas
+            const ref = doc(db, "users", this.currentSession.uid);
+            await setDoc(ref, { trackHistory: persistable }, { merge: true });
+        } catch (err) {
+            console.warn("NovaBeat: No se pudo guardar el historial:", err);
+        }
     }
 
     /**
-     * Actualiza las preferencias del usuario en Firestore.
+     * Recupera el historial de canciones del usuario desde Firestore.
      */
-    public async savePreferences(prefs: Partial<UserPreferences>): Promise<void> {
-        if (!this.currentSession) return;
-        const ref = doc(db, "users", this.currentSession.uid);
-        await setDoc(ref, { preferences: prefs }, { merge: true });
+    public async getTrackHistory(): Promise<import("../models/Track.model").Track[]> {
+        if (!this.currentSession) return [];
+        try {
+            const ref = doc(db, "users", this.currentSession.uid);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return [];
+            const data = snap.data() as { trackHistory?: import("../models/Track.model").Track[] };
+            return data.trackHistory ?? [];
+        } catch {
+            return [];
+        }
     }
 
     // ─── Listener de estado ───────────────────────────────────────────────────
