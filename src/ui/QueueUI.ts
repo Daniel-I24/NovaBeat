@@ -1,4 +1,4 @@
-import { PlaybackQueue } from "../PlayBackQueue";
+import { PlaybackQueue } from "../assets/core/PlaybackQueue";
 import { Track } from "../models/Track.model";
 
 /**

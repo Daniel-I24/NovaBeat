@@ -1,7 +1,7 @@
 import { AudioService } from "../services/AudioService";
-import { PlaybackQueue } from "../PlayBackQueue";
+import { PlaybackQueue } from "../assets/core/PlaybackQueue";
 import { Track } from "../models/Track.model";
-import { TrackNode } from "../TrackNode";
+import { TrackNode } from "../assets/core/TrackNode";
 
 /**
  * Controlador de la interfaz del reproductor NovaBeat.

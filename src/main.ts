@@ -1,13 +1,13 @@
-import { PlaybackQueue } from "./assets/core/PlayBackQueue";
-import { Track } from "./assets/core/models/Track.model";
-import { AuthService } from "./assets/core/services/AuthService";
-import { AudioService } from "./assets/core/services/AudioService";
-import { ThemeService } from "./assets/core/services/ThemeService";
-import { AuthUI } from "./assets/core/ui/AuthUI";
-import { PlayerUI } from "./assets/core/ui/PlayerUI";
-import { Visualizer } from "./assets/core/ui/Visualizer";
-import { QueueUI } from "./assets/core/ui/QueueUI";
-import { INITIAL_TRACKS } from "./assets/core/utils/MockData";
+import { PlaybackQueue } from "./assets/core/PlaybackQueue";
+import { Track } from "./models/Track.model";
+import { AuthService } from "./services/AuthService";
+import { AudioService } from "./services/AudioService";
+import { ThemeService } from "./services/ThemeService";
+import { AuthUI } from "./ui/AuthUI";
+import { PlayerUI } from "./ui/PlayerUI";
+import { Visualizer } from "./ui/Visualizer";
+import { QueueUI } from "./ui/QueueUI";
+import { INITIAL_TRACKS } from "./utils/MockData";
 
 /**
  * Clase Maestra NovaBeatApp.

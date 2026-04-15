@@ -1,5 +1,5 @@
-import { PlaybackQueue } from "../PlayBackQueue";
-import { TrackNode } from "../TrackNode";
+import { PlaybackQueue } from "../assets/core/PlaybackQueue";
+import { TrackNode } from "../assets/core/TrackNode";
 import { Track, PlaybackState } from "../models/Track.model";
 
 /**
