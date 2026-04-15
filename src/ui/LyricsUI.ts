@@ -46,6 +46,13 @@ export class LyricsUI {
     public close(): void { this.isOpen = false; this.panel.classList.remove("open"); }
     public toggle(): void { this.isOpen ? this.close() : this.open(); }
 
+    /** Limpia recursos al cerrar sesión. */
+    public destroy(): void {
+        this.stopSync();
+        this.close();
+        this.currentTrackId = null;
+    }
+
     // ─── Sincronización ───────────────────────────────────────────────────────
 
     private startSync(lines: LyricLine[]): void {

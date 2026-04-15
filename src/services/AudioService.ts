@@ -28,6 +28,9 @@ export class AudioService {
         this.audioElement = new Audio();
         this.audioElement.volume = DEFAULT_VOLUME;
         this.audioElement.preload = "metadata";
+        // crossOrigin debe estar antes de cualquier src para que Web Audio API funcione
+        // sin bloquear la reproducción normal
+        this.audioElement.crossOrigin = "anonymous";
         this.setupListeners();
     }
 
@@ -100,7 +103,6 @@ export class AudioService {
         this.analyzer.fftSize = 128;
 
         if (!this.sourceConnected) {
-            this.audioElement.crossOrigin = "anonymous";
             const src = this.audioContext.createMediaElementSource(this.audioElement);
             src.connect(this.analyzer);
             this.analyzer.connect(this.audioContext.destination);

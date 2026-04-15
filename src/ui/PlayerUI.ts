@@ -71,18 +71,24 @@ export class PlayerUI {
     // ─── Eventos ─────────────────────────────────────────────────────────────
 
     private bindEvents(): void {
-        // Play / Pause — leer estado real del elemento de audio
+        // Play / Pause
         this.playBtn.addEventListener("click", () => {
-            if (!this.visualizerStarted) { this.visualizer?.start(); this.visualizerStarted = true; }
+            this.startVisualizerOnce();
             void this.audioService.togglePlay().then(() => this.syncPlayButton());
         });
 
         // Siguiente / Anterior
         document.getElementById("next-btn")?.addEventListener("click", () => {
-            void this.audioService.playNext().then(() => this.onTrackChange());
+            void this.audioService.playNext().then(() => {
+                this.startVisualizerOnce();
+                this.onTrackChange();
+            });
         });
         document.getElementById("prev-btn")?.addEventListener("click", () => {
-            void this.audioService.playPrevious().then(() => this.onTrackChange());
+            void this.audioService.playPrevious().then(() => {
+                this.startVisualizerOnce();
+                this.onTrackChange();
+            });
         });
 
         // Seek — el usuario arrastra la barra de progreso
@@ -147,10 +153,14 @@ export class PlayerUI {
 
         const { title, artist, coverUrl, duration } = node.trackData;
 
-        // Fade en portada
+        // Fade en portada con fallback si la imagen falla
         this.trackCover.style.opacity = "0";
         setTimeout(() => {
-            this.trackCover.src = coverUrl || "https://placehold.co/200x200/0d0d1a/7c6ff7?text=♪";
+            const src = coverUrl || "https://placehold.co/200x200/0d0d1a/7c6ff7?text=♪";
+            this.trackCover.onerror = () => {
+                this.trackCover.src = "https://placehold.co/200x200/0d0d1a/7c6ff7?text=♪";
+            };
+            this.trackCover.src = src;
             this.trackCover.alt = `${title} — ${artist}`;
             this.trackCover.style.opacity = "1";
         }, 150);
@@ -171,21 +181,29 @@ export class PlayerUI {
     }
 
     private startUIUpdater(): void {
+        let lastPlayingState = false;
+
         setInterval(() => {
             if (this.isSeeking) return;
             const { isPlaying, currentTime } = this.audioService.getState();
+
             this.progressBar.value = String(currentTime);
             this.currentTimeEl.textContent = this.fmt(currentTime);
-            this.syncPlayButton();
+
+            // Solo actualizar el botón si el estado cambió — evita parpadeo
+            if (isPlaying !== lastPlayingState) {
+                lastPlayingState = isPlaying;
+                this.syncPlayButton();
+            }
 
             // Actualizar duración si el audio la cargó después (archivos locales)
             const dur = this.audioService.getDuration();
-            if (dur > 0 && this.progressBar.max !== String(dur)) {
-                this.progressBar.max = String(dur);
+            if (dur > 0 && this.progressBar.max !== String(Math.floor(dur))) {
+                this.progressBar.max = String(Math.floor(dur));
                 this.totalDurationEl.textContent = this.fmt(dur);
             }
 
-            // Actualizar portada si la pista activa cambió (ej: autoplay)
+            // Detectar cambio de pista por autoplay (canción terminó y pasó a la siguiente)
             const node = this.audioService.getCurrentTrackNode();
             if (node && isPlaying && this.trackTitle.textContent !== node.trackData.title) {
                 this.onTrackChange();
@@ -215,7 +233,10 @@ export class PlayerUI {
             const target = node;
             li.addEventListener("click", (e) => {
                 if ((e.target as HTMLElement).classList.contains("queue-remove-btn")) return;
-                void this.audioService.playTrack(target).then(() => this.onTrackChange());
+                void this.audioService.playTrack(target).then(() => {
+                    this.startVisualizerOnce();
+                    this.onTrackChange();
+                });
             });
             li.querySelector(".queue-remove-btn")?.addEventListener("click", (e) => {
                 e.stopPropagation();
@@ -233,6 +254,13 @@ export class PlayerUI {
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    /** Inicia el visualizador solo una vez — requiere interacción del usuario. */
+    private startVisualizerOnce(): void {
+        if (this.visualizerStarted) return;
+        this.visualizerStarted = true;
+        this.visualizer?.start();
+    }
 
     private fmt(s: number): string {
         if (!isFinite(s) || s < 0) return "0:00";

@@ -3,7 +3,7 @@ import { Track } from "./models/Track.model";
 import { FirebaseAuthService, AUTH_SUCCESS_EVENT, AUTH_LOGOUT_EVENT } from "./services/FirebaseAuthService";
 import { AudioService } from "./services/AudioService";
 import { ThemeService } from "./services/ThemeService";
-import { JamendoService } from "./services/JamendoService";
+import { MusicService } from "./services/MusicService";
 import { LyricsService } from "./services/LyricsService";
 import { AuthUI } from "./ui/AuthUI";
 import { PlayerUI } from "./ui/PlayerUI";
@@ -21,7 +21,7 @@ class NovaBeatApp {
     // Servicios de larga vida (no dependen del usuario)
     private readonly themeService  = new ThemeService();
     private readonly authService   = new FirebaseAuthService();
-    private readonly jamendo       = new JamendoService();
+    private readonly musicService  = new MusicService();
     private readonly lyricsService = new LyricsService();
     private readonly authUI        = new AuthUI(this.authService);
 
@@ -53,8 +53,15 @@ class NovaBeatApp {
         );
 
         new QueueUI(this.queue, () => this.playerUI?.renderQueue());
-        new UploadUI(this.queue, () => this.playerUI?.renderQueue());
-        new SearchUI(this.jamendo, this.queue, this.audioService, () => this.playerUI?.renderQueue());
+        new UploadUI(this.queue, () => {
+            this.playerUI?.renderQueue();
+            // Guardar historial cada vez que se agrega una canción
+            void this.authService.saveTrackHistory(this.queue.toArray());
+        });
+        new SearchUI(this.musicService, this.queue, this.audioService, () => {
+            this.playerUI?.renderQueue();
+            void this.authService.saveTrackHistory(this.queue.toArray());
+        });
 
         const session = this.authService.getCurrentSession();
         if (session) this.playerUI.setUserInfo(session);
@@ -62,15 +69,13 @@ class NovaBeatApp {
         // Cargar tema guardado del usuario
         this.authService.getUserPreferences().then((p) => this.themeService.applyTheme(p.theme));
 
-        // Cargar historial del usuario primero, luego trending como complemento
+        // Cargar historial del usuario. Si está vacío, cargar trending de iTunes
         this.authService.getTrackHistory().then((saved) => {
             if (saved.length > 0) {
                 saved.forEach((t) => this.queue.addToEnd(t));
                 this.playerUI?.renderQueue();
-            }
-            // Completar con trending solo si el historial está vacío
-            if (saved.length === 0) {
-                this.jamendo.getTrending(10).then((tracks) => {
+            } else {
+                this.musicService.getTrending(10).then((tracks) => {
                     tracks.forEach((t) => this.queue.addToEnd(t));
                     this.playerUI?.renderQueue();
                 }).catch(() => { /* cola vacía */ });
@@ -81,13 +86,20 @@ class NovaBeatApp {
     private resetApp(): void {
         this.appStarted = false;
 
-        // Detener audio y limpiar estado de sesión
+        // Detener audio, cerrar panel de letras y limpiar estado
         this.audioService.stop();
         this.visualizer?.stop();
         this.visualizer = null;
         this.playerUI = null;
 
-        // Nueva cola y audioService para la próxima sesión (aislamiento por usuario)
+        // Cerrar panel de letras si está abierto
+        document.getElementById("lyrics-panel")?.classList.remove("open");
+        document.getElementById("lyrics-overlay")?.classList.add("hidden");
+
+        // Resetear tema al default al cerrar sesión
+        this.themeService.applyTheme("midnight-dark");
+
+        // Nueva cola y audioService aislados para la próxima sesión
         this.queue = new PlaybackQueue<Track>();
         this.audioService = new AudioService(this.queue);
 
