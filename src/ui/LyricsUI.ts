@@ -34,12 +34,16 @@ export class LyricsUI {
         this.showLoading(track.title, track.artist);
 
         const result = await this.lyricsService.getLyrics(track.artist, track.title);
-
         if (!result) { this.showNotFound(track.title, track.artist); return; }
 
-        this.renderLyrics(track.title, track.artist, result);
+        // Los previews de iTunes duran 30s — la sincronización LRC no es útil
+        // porque los timestamps corresponden a la canción completa.
+        // Se muestran las letras como texto plano en ese caso.
+        const isPreview = track.id.startsWith("itunes_");
+        const displayResult = isPreview ? { ...result, synced: false } : result;
 
-        if (result.synced) this.startSync(result.lines);
+        this.renderLyrics(track.title, track.artist, displayResult);
+        if (displayResult.synced) this.startSync(displayResult.lines);
     }
 
     public open(): void  { this.isOpen = true;  this.panel.classList.add("open"); }

@@ -173,8 +173,11 @@ export class PlayerUI {
 
         this.trackTitle.textContent = title;
         this.trackArtist.textContent = artist;
-        this.progressBar.max = String(duration || 0);
-        this.totalDurationEl.textContent = this.fmt(duration);
+        // Usar duración real del audio si ya cargó, si no usar la del metadato
+        const realDur = this.audioService.getDuration();
+        const displayDur = realDur > 0 ? realDur : duration;
+        this.progressBar.max = String(Math.floor(displayDur));
+        this.totalDurationEl.textContent = this.fmt(displayDur);
 
         if (this.lyricsUI) void this.lyricsUI.loadLyrics(node.trackData);
         this.renderQueue();

@@ -92,7 +92,9 @@ export class MusicService {
             title:    raw.trackName,
             artist:   raw.artistName,
             album:    raw.collectionName || "Single",
-            duration: Math.floor((raw.trackTimeMillis || 30000) / 1000),
+            // Los previews de iTunes duran exactamente 30 segundos
+            // trackTimeMillis es la duración de la canción completa, no del preview
+            duration: 30,
             genre:    raw.primaryGenreName || "Various",
             coverUrl: raw.artworkUrl100.replace("100x100bb", "300x300bb"),
             audioUrl: raw.previewUrl,
