@@ -72,7 +72,14 @@ class NovaBeatApp {
         // Cargar historial del usuario. Si está vacío, cargar trending de iTunes
         this.authService.getTrackHistory().then((saved) => {
             if (saved.length > 0) {
-                saved.forEach((t) => this.queue.addToEnd(t));
+                // Deduplicar por ID antes de agregar a la cola
+                const seen = new Set<string>();
+                saved.forEach((t) => {
+                    if (!seen.has(t.id)) {
+                        seen.add(t.id);
+                        this.queue.addToEnd(t);
+                    }
+                });
                 this.playerUI?.renderQueue();
             } else {
                 this.musicService.getTrending(10).then((tracks) => {

@@ -177,9 +177,10 @@ export class FirebaseAuthService {
     public async saveTrackHistory(tracks: import("../models/Track.model").Track[]): Promise<void> {
         if (!this.currentSession) return;
         try {
-            // Solo guardar canciones con URL reproducible (no blob ni vacías)
+            const seen = new Set<string>();
             const persistable = tracks
                 .filter((t) => t.audioUrl && !t.audioUrl.startsWith("blob:"))
+                .filter((t) => { if (seen.has(t.id)) return false; seen.add(t.id); return true; })
                 .slice(0, 50);
             const ref = doc(db, "users", this.currentSession.uid);
             await setDoc(ref, { trackHistory: persistable }, { merge: true });
