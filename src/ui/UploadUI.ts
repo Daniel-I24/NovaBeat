@@ -56,8 +56,10 @@ export class UploadUI {
         for (const file of files) {
             if (!file.type.startsWith("audio/")) continue;
             const { title, artist } = this.parseName(file.name);
+            // ID basado en nombre+tamaño para que sea estable entre sesiones
+            const stableId = `local_${file.name}_${file.size}`.replace(/\s+/g, "_");
             this.queue.addToEnd({
-                id: crypto.randomUUID(),
+                id: stableId,
                 title,
                 artist,
                 album: "Biblioteca local",

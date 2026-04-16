@@ -2,7 +2,12 @@ import { Track } from "../models/Track.model";
 
 const ITUNES_BASE = "https://itunes.apple.com";
 
-/** Respuesta cruda de la iTunes Search API */
+/** Artistas populares para el trending por defecto */
+const TRENDING_ARTISTS = [
+    "Bad Bunny", "Taylor Swift", "Drake", "The Weeknd", "Feid",
+    "Karol G", "Peso Pluma", "SZA", "Morgan Wallen", "Olivia Rodrigo",
+];
+
 interface ItunesTrack {
     trackId: number;
     trackName: string;
@@ -21,8 +26,8 @@ interface ItunesResponse {
 
 /**
  * Servicio de música usando la iTunes Search API de Apple.
- * Gratuita, sin API key, CORS abierto, catálogo de millones de canciones actuales.
- * Los previews son de 30 segundos — suficiente para descubrir música.
+ * Gratuita, sin API key, CORS abierto, millones de canciones actuales.
+ * Los previews son de 30 segundos.
  */
 export class MusicService {
 
@@ -34,7 +39,7 @@ export class MusicService {
             entity: "song",
             limit: String(limit),
         });
-        return this.fetch(`${ITUNES_BASE}/search?${params}`);
+        return this.fetchTracks(`${ITUNES_BASE}/search?${params}`);
     }
 
     /** Obtiene canciones populares por género. */
@@ -44,71 +49,53 @@ export class MusicService {
             media: "music",
             entity: "song",
             limit: String(limit),
-            attribute: "genreTerm",
         });
-        return this.fetch(`${ITUNES_BASE}/search?${params}`);
+        return this.fetchTracks(`${ITUNES_BASE}/search?${params}`);
     }
 
     /**
-     * Obtiene canciones en tendencia usando el RSS de iTunes Top Songs.
-     * Devuelve las 25 canciones más populares globalmente.
+     * Obtiene canciones en tendencia buscando artistas populares actuales.
+     * Mezcla resultados de varios artistas para dar variedad.
      */
     public async getTrending(limit = 20): Promise<Track[]> {
-        const url = `${ITUNES_BASE}/rss/topsongs/limit=${Math.min(limit, 25)}/json`;
-        try {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`iTunes RSS error: ${res.status}`);
-            const data = await res.json() as {
-                feed: { entry: Array<{
-                    "im:name": { label: string };
-                    "im:artist": { label: string };
-                    "im:collection"?: { "im:name": { label: string } };
-                    "im:duration"?: { label: string };
-                    "im:image": Array<{ label: string }>;
-                    id: { label: string };
-                    "im:contentType"?: { attributes?: { term?: string } };
-                }> }
-            };
+        // Elegir 3 artistas aleatorios para variedad
+        const shuffled = [...TRENDING_ARTISTS].sort(() => Math.random() - 0.5).slice(0, 3);
+        const perArtist = Math.ceil(limit / shuffled.length);
 
-            // El RSS no incluye previewUrl — hacemos una búsqueda por cada canción
-            // Solo tomamos los primeros 10 para no saturar la API
-            const entries = data.feed.entry.slice(0, Math.min(limit, 10));
-            const tracks = await Promise.all(
-                entries.map(async (e) => {
-                    const name   = e["im:name"].label;
-                    const artist = e["im:artist"].label;
-                    const results = await this.search(`${artist} ${name}`, 1);
-                    return results[0] ?? null;
-                })
-            );
-            return tracks.filter((t): t is Track => t !== null);
-        } catch {
-            // Fallback: buscar "top hits" si el RSS falla
-            return this.search("top hits 2024", limit);
+        const results = await Promise.allSettled(
+            shuffled.map((artist) => this.search(artist, perArtist))
+        );
+
+        const tracks: Track[] = [];
+        for (const r of results) {
+            if (r.status === "fulfilled") tracks.push(...r.value);
         }
+
+        // Mezclar y limitar
+        return tracks.sort(() => Math.random() - 0.5).slice(0, limit);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
-    private async fetch(url: string): Promise<Track[]> {
+    private async fetchTracks(url: string): Promise<Track[]> {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`iTunes API error: ${res.status}`);
         const data: ItunesResponse = await res.json();
         return data.results
-            .filter((r) => r.previewUrl) // solo canciones con preview disponible
-            .map(this.mapToTrack);
+            .filter((r) => r.previewUrl)
+            .map((r) => this.mapToTrack(r));
     }
 
     private mapToTrack(raw: ItunesTrack): Track {
         return {
-            id:        `itunes_${raw.trackId}`,
-            title:     raw.trackName,
-            artist:    raw.artistName,
-            album:     raw.collectionName || "Single",
-            duration:  Math.floor((raw.trackTimeMillis || 30000) / 1000),
-            genre:     raw.primaryGenreName || "Various",
-            coverUrl:  raw.artworkUrl100.replace("100x100", "300x300"),
-            audioUrl:  raw.previewUrl,
+            id:       `itunes_${raw.trackId}`,
+            title:    raw.trackName,
+            artist:   raw.artistName,
+            album:    raw.collectionName || "Single",
+            duration: Math.floor((raw.trackTimeMillis || 30000) / 1000),
+            genre:    raw.primaryGenreName || "Various",
+            coverUrl: raw.artworkUrl100.replace("100x100bb", "300x300bb"),
+            audioUrl: raw.previewUrl,
         };
     }
 }

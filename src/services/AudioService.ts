@@ -2,20 +2,24 @@ import { PlaybackQueue } from "../assets/core/PlaybackQueue";
 import { TrackNode } from "../assets/core/TrackNode";
 import { Track, PlaybackState } from "../models/Track.model";
 
-const UI_UPDATE_INTERVAL_MS = 250; // más frecuente para seek preciso
+/** Modos de reproducción */
+export type PlayMode = "normal" | "repeat-one" | "shuffle";
+
+const UI_UPDATE_INTERVAL_MS = 250;
 const DEFAULT_VOLUME = 0.7;
 
 /**
  * Servicio de audio de NovaBeat.
- * HTMLAudioElement maneja la reproducción directamente.
- * AudioContext se crea de forma lazy solo cuando el visualizador lo necesita.
+ * Soporta modos: normal, repetir canción y aleatorio.
  */
 export class AudioService {
     private readonly audioElement: HTMLAudioElement;
+    private readonly queue: PlaybackQueue<Track>;
     private audioContext: AudioContext | null = null;
     private analyzer: AnalyserNode | null = null;
     private sourceConnected = false;
     private currentTrackNode: TrackNode<Track> | null = null;
+    private playMode: PlayMode = "normal";
 
     private state: PlaybackState = {
         isPlaying: false,
@@ -24,7 +28,8 @@ export class AudioService {
         isMuted: false,
     };
 
-    constructor(_queue: PlaybackQueue<Track>) {
+    constructor(queue: PlaybackQueue<Track>) {
+        this.queue = queue;
         this.audioElement = new Audio();
         this.audioElement.volume = DEFAULT_VOLUME;
         this.audioElement.preload = "metadata";
@@ -69,11 +74,48 @@ export class AudioService {
     }
 
     public async playNext(): Promise<void> {
+        if (this.playMode === "repeat-one" && this.currentTrackNode) {
+            // Repetir la misma canción desde el inicio
+            this.audioElement.currentTime = 0;
+            await this.audioElement.play();
+            return;
+        }
+        if (this.playMode === "shuffle") {
+            await this.playRandom();
+            return;
+        }
         if (this.currentTrackNode?.nextTrack) await this.playTrack(this.currentTrackNode.nextTrack);
     }
 
     public async playPrevious(): Promise<void> {
+        // Si llevamos más de 3 segundos, reiniciar la canción actual
+        if (this.audioElement.currentTime > 3) {
+            this.audioElement.currentTime = 0;
+            return;
+        }
+        if (this.playMode === "shuffle") {
+            await this.playRandom();
+            return;
+        }
         if (this.currentTrackNode?.previousTrack) await this.playTrack(this.currentTrackNode.previousTrack);
+    }
+
+    /** Cicla entre los modos: normal → repeat-one → shuffle → normal */
+    public cyclePlayMode(): PlayMode {
+        const modes: PlayMode[] = ["normal", "repeat-one", "shuffle"];
+        const next = modes[(modes.indexOf(this.playMode) + 1) % modes.length];
+        this.playMode = next;
+        return next;
+    }
+
+    public getPlayMode(): PlayMode { return this.playMode; }
+
+    private async playRandom(): Promise<void> {
+        const size = this.queue.getQueueSize();
+        if (size === 0) return;
+        const randomIndex = Math.floor(Math.random() * size);
+        const node = this.queue.getTrackNodeByIndex(randomIndex);
+        if (node) await this.playTrack(node);
     }
 
     public stop(): void {

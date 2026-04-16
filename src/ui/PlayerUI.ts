@@ -117,6 +117,12 @@ export class PlayerUI {
             if (node) void this.lyricsUI?.loadLyrics(node.trackData);
         });
 
+        // Modo de reproducción (normal → repetir → aleatorio)
+        document.getElementById("playmode-btn")?.addEventListener("click", () => {
+            const mode = this.audioService.cyclePlayMode();
+            this.syncPlayModeButton(mode);
+        });
+
         // Toggle cola — panel slide
         document.getElementById("queue-toggle-btn")?.addEventListener("click", () => {
             this.queueVisible = !this.queueVisible;
@@ -182,33 +188,46 @@ export class PlayerUI {
 
     private startUIUpdater(): void {
         let lastPlayingState = false;
+        let lastTime = -1;
+        let lastDur = -1;
 
-        setInterval(() => {
+        const tick = (): void => {
+            requestAnimationFrame(tick);
             if (this.isSeeking) return;
+
             const { isPlaying, currentTime } = this.audioService.getState();
+            const dur = this.audioService.getDuration();
 
-            this.progressBar.value = String(currentTime);
-            this.currentTimeEl.textContent = this.fmt(currentTime);
+            // Actualizar tiempo solo cuando cambia (evita titileo)
+            const roundedTime = Math.floor(currentTime);
+            if (roundedTime !== lastTime) {
+                lastTime = roundedTime;
+                this.progressBar.value = String(currentTime);
+                this.currentTimeEl.textContent = this.fmt(currentTime);
+            }
 
-            // Solo actualizar el botón si el estado cambió — evita parpadeo
+            // Actualizar duración solo cuando cambia
+            const roundedDur = Math.floor(dur);
+            if (roundedDur > 0 && roundedDur !== lastDur) {
+                lastDur = roundedDur;
+                this.progressBar.max = String(roundedDur);
+                this.totalDurationEl.textContent = this.fmt(dur);
+            }
+
+            // Botón play solo cuando cambia el estado
             if (isPlaying !== lastPlayingState) {
                 lastPlayingState = isPlaying;
                 this.syncPlayButton();
             }
 
-            // Actualizar duración si el audio la cargó después (archivos locales)
-            const dur = this.audioService.getDuration();
-            if (dur > 0 && this.progressBar.max !== String(Math.floor(dur))) {
-                this.progressBar.max = String(Math.floor(dur));
-                this.totalDurationEl.textContent = this.fmt(dur);
-            }
-
-            // Detectar cambio de pista por autoplay (canción terminó y pasó a la siguiente)
+            // Detectar cambio de pista por autoplay
             const node = this.audioService.getCurrentTrackNode();
             if (node && isPlaying && this.trackTitle.textContent !== node.trackData.title) {
                 this.onTrackChange();
             }
-        }, AudioService.UI_UPDATE_INTERVAL);
+        };
+
+        requestAnimationFrame(tick);
     }
 
     public renderQueue(): void {
@@ -260,6 +279,21 @@ export class PlayerUI {
         if (this.visualizerStarted) return;
         this.visualizerStarted = true;
         this.visualizer?.start();
+    }
+
+    /** Actualiza el ícono del botón de modo según el estado actual. */
+    private syncPlayModeButton(mode = this.audioService.getPlayMode()): void {
+        const btn = document.getElementById("playmode-btn");
+        if (!btn) return;
+        const config = {
+            "normal":     { icon: "🔁", title: "Normal",          active: false },
+            "repeat-one": { icon: "🔂", title: "Repetir canción", active: true  },
+            "shuffle":    { icon: "🔀", title: "Aleatorio",       active: true  },
+        } as const;
+        const { icon, title, active } = config[mode];
+        btn.textContent = icon;
+        btn.title = title;
+        btn.classList.toggle("control-btn-active", active);
     }
 
     private fmt(s: number): string {
